@@ -1,7 +1,7 @@
+import os
 import re
 import time
 import unittest
-import uuid
 from unittest import TestCase
 from unittest import mock
 from urllib.parse import quote
@@ -11,7 +11,6 @@ from freezegun import freeze_time
 from werkzeug.exceptions import BadRequest
 from fakeredis import FakeStrictRedis
 
-import os
 os.environ['MOCK_REDIS'] = 'true'
 
 # noinspection PyPep8Naming
@@ -31,7 +30,8 @@ class SnapPassTestCase(TestCase):
         self.assertIsNone(snappass.get_password(key))
 
     def test_password_is_stored_exactly(self):
-        # We now store exactly what the client sends (which the client encrypts)
+        # We now store exactly what the client sends
+        # (which the client encrypts)
         password_payload = "encrypted_payload_base64"
         token = snappass.set_password(password_payload, 30)
         stored_password_text = snappass.redis_client.get(token).decode('utf-8')
@@ -40,7 +40,8 @@ class SnapPassTestCase(TestCase):
     def test_returned_token_format(self):
         password = "trustsome1"
         token = snappass.set_password(password, 30)
-        # Should start with REDIS_PREFIX and be followed by 22 chars of urlsafe base64
+        # Should start with REDIS_PREFIX and be followed by
+        # 22 chars of urlsafe base64
         self.assertTrue(token.startswith(snappass.REDIS_PREFIX))
         # 16 bytes urlsafe base64 is 22 chars
         self.assertEqual(len(snappass.REDIS_PREFIX) + 22, len(token))
@@ -156,8 +157,9 @@ class SnapPassRoutesTestCase(TestCase):
             )
 
             json_content = rv.get_json()
-            key = re.search(r'https://localhost/([^"]+)', json_content['link']).group(1)
-            key = unquote(key)
+            match = re.search(r'https://localhost/([^"]+)',
+                              json_content['link'])
+            key = unquote(match.group(1))
 
             frozen_time.move_to("2020-05-22 11:59:59")
             self.assertEqual(snappass.get_password(key), password)
@@ -176,8 +178,9 @@ class SnapPassRoutesTestCase(TestCase):
             )
 
             json_content = rv.get_json()
-            key = re.search(r'https://localhost/([^"]+)', json_content['link']).group(1)
-            key = unquote(key)
+            match = re.search(r'https://localhost/([^"]+)',
+                              json_content['link'])
+            key = unquote(match.group(1))
 
             frozen_time.move_to("2020-05-22 11:59:59")
             self.assertEqual(snappass.get_password(key), password)
@@ -204,8 +207,9 @@ class SnapPassRoutesTestCase(TestCase):
             )
 
             json_content = rv.get_json()
-            key = re.search(r'https://localhost/([^"]+)', json_content['link']).group(1)
-            key = unquote(key)
+            match = re.search(r'https://localhost/([^"]+)',
+                              json_content['link'])
+            key = unquote(match.group(1))
 
             frozen_time.move_to("2020-05-22 11:59:59")
             self.assertEqual(snappass.get_password(key), password)
@@ -241,7 +245,9 @@ class SnapPassRoutesTestCase(TestCase):
 
         self.assertEqual(rv.status_code, 200)
         json_content = rv.get_json()
-        self.assertTrue(json_content['link'].startswith('https://snappass.example.org/'))
+        self.assertTrue(
+            json_content['link'].startswith('https://snappass.example.org/')
+        )
 
     @mock.patch('redis.client.StrictRedis', FakeStrictRedis)
     def test_set_password_api_v2(self):

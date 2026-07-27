@@ -4,13 +4,16 @@ import secrets
 import typing
 
 import redis
-from flask import abort, Flask, render_template, request, jsonify, make_response
+from flask import (
+    abort, Flask, render_template, request, jsonify, make_response
+)
 from redis.exceptions import ConnectionError
 from urllib.parse import quote_plus, unquote_plus, urljoin, urlsplit
 # _ is required to get the Jinja templates translated
 from flask_babel import Babel, _  # noqa: F401
 
-NO_SSL: bool = os.environ.get('NO_SSL', 'False').lower() in ('true', '1', 't', 'y', 'yes')
+_no_ssl_env = os.environ.get('NO_SSL', 'False').lower()
+NO_SSL: bool = _no_ssl_env in ('true', '1', 't', 'y', 'yes')
 URL_PREFIX: typing.Optional[str] = os.environ.get('URL_PREFIX', None)
 HOST_OVERRIDE: typing.Optional[str] = os.environ.get('HOST_OVERRIDE', None)
 
@@ -20,7 +23,10 @@ if os.environ.get('DEBUG'):
     app.debug = True
 secret_key = os.environ.get('SECRET_KEY')
 if not secret_key:
-    raise ValueError("Error: SECRET_KEY environment variable is not set. It is required for securely signing session cookies.")
+    raise ValueError(
+        "Error: SECRET_KEY environment variable is not set. "
+        "It is required for securely signing session cookies."
+    )
 app.secret_key = secret_key
 app.config.update(
     dict(STATIC_URL=os.environ.get('STATIC_URL', 'static')))
@@ -87,7 +93,12 @@ def check_redis_alive(fn: typing.Callable) -> typing.Callable:
     return inner
 
 
-def as_validation_problem(request: request, problem_type: str, problem_title: str, invalid_params: typing.List[typing.Dict[str, str]]) -> make_response:
+def as_validation_problem(
+    request: request,
+    problem_type: str,
+    problem_title: str,
+    invalid_params: typing.List[typing.Dict[str, str]]
+) -> make_response:
     base_url = set_base_url(request)
 
     problem = {
@@ -98,7 +109,12 @@ def as_validation_problem(request: request, problem_type: str, problem_title: st
     return as_problem_response(problem)
 
 
-def as_not_found_problem(request: request, problem_type: str, problem_title: str, invalid_params: typing.List[typing.Dict[str, str]]) -> make_response:
+def as_not_found_problem(
+    request: request,
+    problem_type: str,
+    problem_title: str,
+    invalid_params: typing.List[typing.Dict[str, str]]
+) -> make_response:
     base_url = set_base_url(request)
 
     problem = {
@@ -109,7 +125,10 @@ def as_not_found_problem(request: request, problem_type: str, problem_title: str
     return as_problem_response(problem, 404)
 
 
-def as_problem_response(problem: typing.Dict[str, typing.Any], status_code: typing.Optional[int] = None) -> make_response:
+def as_problem_response(
+    problem: typing.Dict[str, typing.Any],
+    status_code: typing.Optional[int] = None
+) -> make_response:
     if not isinstance(status_code, int) or not status_code:
         status_code = 400
 
@@ -202,7 +221,7 @@ def handle_password():
         token = set_password(password, ttl_val)
         base_url = set_base_url(request)
         link = f"{base_url}{quote_plus(token)}"
-        
+
         # We merge confirm.html into set_password.html via AJAX,
         # so this endpoint should always return JSON for clients using AJAX.
         if request.accept_mimetypes.accept_json:
@@ -237,7 +256,7 @@ def api_v2_set_password():
     if not password:
         invalid_params.append({
             "name": "password",
-            "reason": "The password is required and should not be null or empty."
+            "reason": "The password is required and must not be empty."
         })
 
     if not isinstance(ttl, int) or ttl > MAX_TTL:
@@ -259,7 +278,7 @@ def api_v2_set_password():
     base_url = set_base_url(request)
     api_link = urljoin(base_url, f"{request.path}/{url_token}")
     web_link = urljoin(base_url, url_token)
-    
+
     response_content = {
         "token": token,
         "links": [{
@@ -278,7 +297,7 @@ def api_v2_set_password():
 def api_v2_check_password(token: str):
     token = unquote_plus(token)
     if not password_exists(token):
-        # Return NotFound, to indicate that password does not exists (anymore or at all)
+        # Return NotFound, to indicate that password does not exist
         return ('', 404)
     else:
         # Return OK, to indicate that password still exists
@@ -290,7 +309,7 @@ def api_v2_retrieve_password(token: str):
     token = unquote_plus(token)
     password = get_password(token)
     if not password:
-        # Return NotFound, to indicate that password does not exists (anymore or at all)
+        # Return NotFound, to indicate that password does not exist
         return as_not_found_problem(
             request,
             "get-password-error",
