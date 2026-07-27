@@ -14,7 +14,7 @@ from fakeredis import FakeStrictRedis
 os.environ['MOCK_REDIS'] = 'true'
 
 # noinspection PyPep8Naming
-import snappass.main as snappass
+import snappass.main as snappass  # noqa: E402
 
 __author__ = 'davedash'
 
