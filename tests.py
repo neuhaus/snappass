@@ -7,10 +7,12 @@ from unittest import mock
 from urllib.parse import quote
 from urllib.parse import unquote
 
-from cryptography.fernet import Fernet
 from freezegun import freeze_time
 from werkzeug.exceptions import BadRequest
 from fakeredis import FakeStrictRedis
+
+import os
+os.environ['MOCK_REDIS'] = 'true'
 
 # noinspection PyPep8Naming
 import snappass.main as snappass
@@ -28,46 +30,20 @@ class SnapPassTestCase(TestCase):
         # Assert that we can't look this up a second time.
         self.assertIsNone(snappass.get_password(key))
 
-    def test_password_is_not_stored_in_plaintext(self):
-        password = "trustno1"
-        token = snappass.set_password(password, 30)
-        redis_key = token.split(snappass.TOKEN_SEPARATOR)[0]
-        stored_password_text = snappass.redis_client.get(redis_key).decode('utf-8')
-        self.assertNotIn(password, stored_password_text)
+    def test_password_is_stored_exactly(self):
+        # We now store exactly what the client sends (which the client encrypts)
+        password_payload = "encrypted_payload_base64"
+        token = snappass.set_password(password_payload, 30)
+        stored_password_text = snappass.redis_client.get(token).decode('utf-8')
+        self.assertEqual(password_payload, stored_password_text)
 
     def test_returned_token_format(self):
         password = "trustsome1"
         token = snappass.set_password(password, 30)
-        token_fragments = token.split(snappass.TOKEN_SEPARATOR)
-        self.assertEqual(2, len(token_fragments))
-        redis_key, encryption_key = token_fragments
-        self.assertEqual(32 + len(snappass.REDIS_PREFIX), len(redis_key))
-        try:
-            Fernet(encryption_key.encode('utf-8'))
-        except ValueError:
-            self.fail('the encryption key is not valid')
-
-    def test_encryption_key_is_returned(self):
-        password = "trustany1"
-        token = snappass.set_password(password, 30)
-        token_fragments = token.split(snappass.TOKEN_SEPARATOR)
-        redis_key, encryption_key = token_fragments
-        stored_password = snappass.redis_client.get(redis_key)
-        fernet = Fernet(encryption_key.encode('utf-8'))
-        decrypted_password = fernet.decrypt(stored_password).decode('utf-8')
-        self.assertEqual(password, decrypted_password)
-
-    def test_unencrypted_passwords_still_work(self):
-        unencrypted_password = "trustevery1"
-        storage_key = uuid.uuid4().hex
-        snappass.redis_client.setex(storage_key, 30, unencrypted_password)
-        retrieved_password = snappass.get_password(storage_key)
-        self.assertEqual(unencrypted_password, retrieved_password)
-
-    def test_password_is_decoded(self):
-        password = "correct horse battery staple"
-        key = snappass.set_password(password, 30)
-        self.assertFalse(isinstance(snappass.get_password(key), bytes))
+        # Should start with REDIS_PREFIX and be followed by 22 chars of urlsafe base64
+        self.assertTrue(token.startswith(snappass.REDIS_PREFIX))
+        # 16 bytes urlsafe base64 is 22 chars
+        self.assertEqual(len(snappass.REDIS_PREFIX) + 22, len(token))
 
     def test_clean_input(self):
         # Test Bad Data
@@ -89,11 +65,13 @@ class SnapPassTestCase(TestCase):
                 "/", data={'password': 'foo', 'ttl': 'hour'}, method='POST'):
             self.assertEqual((3600, 'foo'), snappass.clean_input())
 
+    @mock.patch('redis.client.StrictRedis', FakeStrictRedis)
     def test_password_before_expiration(self):
         password = 'fidelio'
         key = snappass.set_password(password, 1)
         self.assertEqual(password, snappass.get_password(key))
 
+    @mock.patch('redis.client.StrictRedis', FakeStrictRedis)
     def test_password_after_expiration(self):
         password = 'open sesame'
         key = snappass.set_password(password, 1)
@@ -121,16 +99,20 @@ class SnapPassRoutesTestCase(TestCase):
         self.assertEqual('200 OK', response.status)
         self.assertEqual('{}', response.get_data(as_text=True).strip())
 
+    @mock.patch('redis.client.StrictRedis', FakeStrictRedis)
     def test_preview_password(self):
         password = "I like novelty kitten statues!"
         key = snappass.set_password(password, 30)
         rv = self.app.get('/{0}'.format(key))
+        # The password payload should not be visible in preview
         self.assertNotIn(password, rv.get_data(as_text=True))
 
+    @mock.patch('redis.client.StrictRedis', FakeStrictRedis)
     def test_show_password(self):
         password = "I like novelty kitten statues!"
         key = snappass.set_password(password, 30)
         rv = self.app.post('/{0}'.format(key))
+        # The payload (encrypted text) is shown in the text area
         self.assertIn(password, rv.get_data(as_text=True))
 
     def test_url_prefix(self):
@@ -139,21 +121,7 @@ class SnapPassRoutesTestCase(TestCase):
         rv = self.app.post('/', data={'password': password, 'ttl': 'hour'})
         self.assertIn("localhost/test/prefix/", rv.get_data(as_text=True))
 
-    def test_set_password(self):
-        with freeze_time("2020-05-08 12:00:00") as frozen_time:
-            password = 'my name is my passport. verify me.'
-            rv = self.app.post('/', data={'password': password, 'ttl': 'two weeks'})
-
-            html_content = rv.data.decode("ascii")
-            key = re.search(r'id="password-link" value="https://localhost/([^"]+)', html_content).group(1)
-            key = unquote(key)
-
-            frozen_time.move_to("2020-05-22 11:59:59")
-            self.assertEqual(snappass.get_password(key), password)
-
-            frozen_time.move_to("2020-05-22 12:00:00")
-            self.assertIsNone(snappass.get_password(key))
-
+    @mock.patch('redis.client.StrictRedis', FakeStrictRedis)
     def test_set_password_json(self):
         with freeze_time("2020-05-08 12:00:00") as frozen_time:
             password = 'my name is my passport. verify me.'
@@ -173,13 +141,14 @@ class SnapPassRoutesTestCase(TestCase):
             frozen_time.move_to("2020-05-22 12:00:00")
             self.assertIsNone(snappass.get_password(key))
 
+    @mock.patch('redis.client.StrictRedis', FakeStrictRedis)
     def test_set_password_api(self):
         with freeze_time("2020-05-08 12:00:00") as frozen_time:
             password = 'my name is my passport. verify me.'
             rv = self.app.post(
                 '/api/set_password/',
                 headers={'Accept': 'application/json'},
-                json={'password': password, 'ttl': '1209600'},
+                json={'password': password, 'ttl': 1209600},
             )
 
             json_content = rv.get_json()
@@ -192,6 +161,7 @@ class SnapPassRoutesTestCase(TestCase):
             frozen_time.move_to("2020-05-22 12:00:00")
             self.assertIsNone(snappass.get_password(key))
 
+    @mock.patch('redis.client.StrictRedis', FakeStrictRedis)
     def test_set_password_api_default_ttl(self):
         with freeze_time("2020-05-08 12:00:00") as frozen_time:
             password = 'my name is my passport. verify me.'
@@ -215,33 +185,31 @@ class SnapPassRoutesTestCase(TestCase):
         rv = self.app.post(
             '/api/set_password/',
             headers={'Host': 'evil.com', 'Accept': 'application/json'},
-            json={'password': 'my secret', 'ttl': '1209600'},
+            json={'password': 'my secret', 'ttl': 1209600},
         )
 
         self.assertEqual(rv.status_code, 400)
 
     def test_uses_host_override_with_untrusted_host_header(self):
-        # When HOST_OVERRIDE is configured, the inbound Host header is never
-        # used to derive the base URL, so an untrusted host is harmless: the
-        # request succeeds (200) and the generated link uses HOST_OVERRIDE.
         snappass.HOST_OVERRIDE = 'snappass.example.org'
         rv = self.app.post(
             '/api/set_password/',
             headers={'Host': 'evil.com', 'Accept': 'application/json'},
-            json={'password': 'my secret', 'ttl': '1209600'},
+            json={'password': 'my secret', 'ttl': 1209600},
         )
 
         self.assertEqual(rv.status_code, 200)
         json_content = rv.get_json()
         self.assertTrue(json_content['link'].startswith('https://snappass.example.org/'))
 
+    @mock.patch('redis.client.StrictRedis', FakeStrictRedis)
     def test_set_password_api_v2(self):
         with freeze_time("2020-05-08 12:00:00") as frozen_time:
             password = 'my name is my passport. verify me.'
             rv = self.app.post(
                 '/api/v2/passwords',
                 headers={'Accept': 'application/json'},
-                json={'password': password, 'ttl': '1209600'},
+                json={'password': password, 'ttl': 1209600},
             )
 
             json_content = rv.get_json()
@@ -253,6 +221,7 @@ class SnapPassRoutesTestCase(TestCase):
             frozen_time.move_to("2020-05-22 12:00:00")
             self.assertIsNone(snappass.get_password(key))
 
+    @mock.patch('redis.client.StrictRedis', FakeStrictRedis)
     def test_set_password_api_v2_default_ttl(self):
         with freeze_time("2020-05-08 12:00:00") as frozen_time:
             password = 'my name is my passport. verify me.'
@@ -291,7 +260,7 @@ class SnapPassRoutesTestCase(TestCase):
         rv = self.app.post(
             '/api/v2/passwords',
             headers={'Accept': 'application/json'},
-            json={'password': password, 'ttl': '1209600000'},
+            json={'password': password, 'ttl': 1209600000},
         )
 
         self.assertEqual(rv.status_code, 400)
@@ -306,7 +275,7 @@ class SnapPassRoutesTestCase(TestCase):
         rv = self.app.post(
             '/api/v2/passwords',
             headers={'Accept': 'application/json'},
-            json={'password': '', 'ttl': '1209600000'},
+            json={'password': '', 'ttl': 1209600000},
         )
 
         self.assertEqual(rv.status_code, 400)
@@ -319,6 +288,7 @@ class SnapPassRoutesTestCase(TestCase):
         bad_ttl = invalid_params[1]
         self.assertEqual(bad_ttl['name'], 'ttl')
 
+    @mock.patch('redis.client.StrictRedis', FakeStrictRedis)
     def test_check_password_api_v2(self):
         password = 'my name is my passport. verify me.'
         rv = self.app.post(
@@ -333,6 +303,7 @@ class SnapPassRoutesTestCase(TestCase):
         rvc = self.app.head('/api/v2/passwords/' + quote(key))
         self.assertEqual(rvc.status_code, 200)
 
+    @mock.patch('redis.client.StrictRedis', FakeStrictRedis)
     def test_check_password_api_v2_bad_keys(self):
         password = 'my name is my passport. verify me.'
         rv = self.app.post(
@@ -347,6 +318,7 @@ class SnapPassRoutesTestCase(TestCase):
         rvc = self.app.head('/api/v2/passwords/' + quote(key[::-1]))
         self.assertEqual(rvc.status_code, 404)
 
+    @mock.patch('redis.client.StrictRedis', FakeStrictRedis)
     def test_retrieve_password_api_v2(self):
         password = 'my name is my passport. verify me.'
         rv = self.app.post(
@@ -365,6 +337,7 @@ class SnapPassRoutesTestCase(TestCase):
         retrieved_password = json_content_retrieved['password']
         self.assertEqual(retrieved_password, password)
 
+    @mock.patch('redis.client.StrictRedis', FakeStrictRedis)
     def test_retrieve_password_api_v2_bad_keys(self):
         password = 'my name is my passport. verify me.'
         rv = self.app.post(

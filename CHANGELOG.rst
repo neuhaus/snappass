@@ -1,3 +1,10 @@
+Version 1.7.0
+-------------
+* Migrate encryption to client-side (browser) using AES-GCM and Web Crypto API.
+* Remove `cryptography` dependency.
+* APIs now expect pre-encrypted secrets.
+* Migrate to `pyproject.toml` and modern Python formatting.
+
 Version 1.6.0
 -------------
 * Drop support for officially unsupported Python versions (< Python 3.7)

@@ -11,6 +11,7 @@ services:
         environment:
             - REDIS_HOST=redis
             - NO_SSL=True
+            - SECRET_KEY=""
         depends_on:
           - redis
 
