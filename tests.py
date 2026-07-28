@@ -8,7 +8,6 @@ from urllib.parse import quote
 from urllib.parse import unquote
 
 from freezegun import freeze_time
-from werkzeug.exceptions import BadRequest
 from fakeredis import FakeStrictRedis
 
 os.environ['MOCK_REDIS'] = 'true'
@@ -45,26 +44,6 @@ class SnapPassTestCase(TestCase):
         self.assertTrue(token.startswith(snappass.REDIS_PREFIX))
         # 16 bytes urlsafe base64 is 22 chars
         self.assertEqual(len(snappass.REDIS_PREFIX) + 22, len(token))
-
-    def test_clean_input(self):
-        # Test Bad Data
-        with snappass.app.test_request_context(
-                "/", data={'password': 'foo', 'ttl': 'bar'}, method='POST'):
-            self.assertRaises(BadRequest, snappass.clean_input)
-
-        # No Password
-        with snappass.app.test_request_context(
-                "/", method='POST'):
-            self.assertRaises(BadRequest, snappass.clean_input)
-
-        # No TTL
-        with snappass.app.test_request_context(
-                "/", data={'password': 'foo'}, method='POST'):
-            self.assertRaises(BadRequest, snappass.clean_input)
-
-        with snappass.app.test_request_context(
-                "/", data={'password': 'foo', 'ttl': 'hour'}, method='POST'):
-            self.assertEqual((3600, 'foo'), snappass.clean_input())
 
     @mock.patch('redis.client.StrictRedis', FakeStrictRedis)
     def test_password_before_expiration(self):

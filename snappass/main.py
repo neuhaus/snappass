@@ -174,26 +174,6 @@ def empty(value: typing.Optional[str]) -> bool:
     return not value
 
 
-def clean_input() -> typing.Tuple[int, str]:
-    """
-    Make sure we're not getting bad data from the front end,
-    format data to be machine readable
-    """
-    password = request.form.get('password', '')
-    if empty(password):
-        abort(400)
-
-    ttl_input = request.form.get('ttl', '')
-    if empty(ttl_input):
-        abort(400)
-
-    time_period = ttl_input.lower()
-    if time_period not in TIME_CONVERSION:
-        abort(400)
-
-    return TIME_CONVERSION[time_period], password
-
-
 def set_base_url(req: Request) -> str:
     scheme = 'http' if NO_SSL else 'https'
     if HOST_OVERRIDE:
