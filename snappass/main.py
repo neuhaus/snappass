@@ -5,7 +5,8 @@ import typing
 
 import redis
 from flask import (
-    abort, Flask, render_template, request, jsonify, make_response, Response, Request
+    abort, Flask, render_template, request, jsonify, make_response,
+    Response, Request
 )
 from redis.exceptions import ConnectionError
 from urllib.parse import quote_plus, unquote_plus, urljoin, urlsplit
@@ -325,7 +326,9 @@ def api_v2_retrieve_password(token: str) -> Response:
 
 
 @app.route('/<password_key>', methods=['GET'])
-def preview_password(password_key: str) -> typing.Union[str, typing.Tuple[str, int]]:
+def preview_password(
+    password_key: str
+) -> typing.Union[str, typing.Tuple[str, int]]:
     password_key = unquote_plus(password_key)
     if not password_exists(password_key):
         return render_template('expired.html'), 404
@@ -334,7 +337,9 @@ def preview_password(password_key: str) -> typing.Union[str, typing.Tuple[str, i
 
 
 @app.route('/<password_key>', methods=['POST'])
-def show_password(password_key: str) -> typing.Union[str, typing.Tuple[str, int]]:
+def show_password(
+    password_key: str
+) -> typing.Union[str, typing.Tuple[str, int]]:
     password_key = unquote_plus(password_key)
     password = get_password(password_key)
     if not password:
