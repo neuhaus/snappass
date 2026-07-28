@@ -14,6 +14,7 @@ os.environ['MOCK_REDIS'] = 'true'
 
 # noinspection PyPep8Naming
 import snappass.main as snappass  # noqa: E402
+import snappass.storage as storage  # noqa: E402
 
 __author__ = 'davedash'
 
@@ -33,7 +34,7 @@ class SnapPassTestCase(TestCase):
         # (which the client encrypts)
         password_payload = "encrypted_payload_base64"
         token = snappass.set_password(password_payload, 30)
-        stored_password_text = snappass.redis_client.get(token).decode('utf-8')
+        stored_password_text = storage.redis_client.get(token).decode('utf-8')
         self.assertEqual(password_payload, stored_password_text)
 
     def test_returned_token_format(self):
@@ -41,9 +42,9 @@ class SnapPassTestCase(TestCase):
         token = snappass.set_password(password, 30)
         # Should start with REDIS_PREFIX and be followed by
         # 22 chars of urlsafe base64
-        self.assertTrue(token.startswith(snappass.REDIS_PREFIX))
+        self.assertTrue(token.startswith(storage.REDIS_PREFIX))
         # 16 bytes urlsafe base64 is 22 chars
-        self.assertEqual(len(snappass.REDIS_PREFIX) + 22, len(token))
+        self.assertEqual(len(storage.REDIS_PREFIX) + 22, len(token))
 
     @mock.patch('redis.client.StrictRedis', FakeStrictRedis)
     def test_password_before_expiration(self):
