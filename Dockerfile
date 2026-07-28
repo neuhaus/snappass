@@ -8,10 +8,10 @@ RUN groupadd -r snappass && \
 
 WORKDIR $APP_DIR
 
-COPY ["pyproject.toml", "requirements.txt", "README.rst", "AUTHORS.rst", "LICENSE", "$APP_DIR/"]
+COPY ["pyproject.toml", "README.rst", "AUTHORS.rst", "LICENSE", "$APP_DIR/"]
 COPY ["./snappass", "$APP_DIR/snappass"]
 
-RUN pip install --no-cache-dir -r requirements.txt && \
+RUN pip install --no-cache-dir . && \
     pybabel compile -d snappass/translations && \
     pip install --no-cache-dir . && \
     chown -R snappass $APP_DIR && \

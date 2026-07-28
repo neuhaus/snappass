@@ -12,7 +12,7 @@ redis_client: redis.StrictRedis
 if os.environ.get('MOCK_REDIS'):
     from fakeredis import FakeStrictRedis
 
-    redis_client = FakeStrictRedis(version=(6, 2), protocol=2)  # type: ignore
+    redis_client = FakeStrictRedis()  # type: ignore
 elif os.environ.get('REDIS_URL'):
     redis_url = os.environ.get('REDIS_URL')
     if not redis_url:
