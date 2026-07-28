@@ -115,3 +115,23 @@ Before you submit a pull request, check that it meets these guidelines:
    your new functionality into a function with a docstring, and add the
    feature to the list in README.rst.
 3. The pull request should work on all supported Python versions.
+
+Releasing a New Version
+-----------------------
+
+This project uses `bumpversion <https://github.com/peritus/bumpversion>`_ to manage releases.
+The `.bumpversion.cfg` file is configured to automatically update the version strings in both `pyproject.toml` and `snappass/__init__.py`, create a new git commit, and generate a git tag.
+
+When you are ready to make a release, ensure you are on the main branch with a clean working directory, and run one of the following commands depending on the type of release (major, minor, or patch):
+
+::
+
+    $ bumpversion patch  # (e.g. 1.7.0 -> 1.7.1)
+    $ bumpversion minor  # (e.g. 1.7.0 -> 1.8.0)
+    $ bumpversion major  # (e.g. 1.7.0 -> 2.0.0)
+
+Then, push the commit and the tags to GitHub:
+
+::
+
+    $ git push origin master --tags
