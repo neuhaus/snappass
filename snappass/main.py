@@ -5,12 +5,12 @@ import typing
 
 import redis
 from flask import (
-    abort, Flask, render_template, request, jsonify, make_response
+    abort, Flask, render_template, request, jsonify, make_response, Response, Request
 )
 from redis.exceptions import ConnectionError
 from urllib.parse import quote_plus, unquote_plus, urljoin, urlsplit
 # _ is required to get the Jinja templates translated
-from flask_babel import Babel, _  # noqa: F401
+from flask_babel import Babel, _  # type: ignore # noqa: F401
 
 _no_ssl_env = os.environ.get('NO_SSL', 'False').lower()
 NO_SSL: bool = _no_ssl_env in ('true', '1', 't', 'y', 'yes')
@@ -40,12 +40,15 @@ def get_locale() -> typing.Optional[str]:
 babel = Babel(app, locale_selector=get_locale)
 
 # Initialize Redis
+redis_client: redis.StrictRedis
 if os.environ.get('MOCK_REDIS'):
     from fakeredis import FakeStrictRedis
 
-    redis_client = FakeStrictRedis(version=(6, 2), protocol=2)
+    redis_client = FakeStrictRedis(version=(6, 2), protocol=2)  # type: ignore
 elif os.environ.get('REDIS_URL'):
-    redis_client = redis.StrictRedis.from_url(os.environ.get('REDIS_URL'))
+    redis_url = os.environ.get('REDIS_URL')
+    assert redis_url is not None
+    redis_client = redis.StrictRedis.from_url(redis_url)
 else:
     redis_host = os.environ.get('REDIS_HOST', 'localhost')
     redis_port = int(os.environ.get('REDIS_PORT', 6379))
@@ -64,7 +67,7 @@ DEFAULT_API_TTL: int = 1209600
 MAX_TTL: int = DEFAULT_API_TTL
 
 
-def _request_has_trusted_host(req: request) -> bool:
+def _request_has_trusted_host(req: Request) -> bool:
     # When HOST_OVERRIDE is not configured the base URL is derived from the
     # request's Host header, which a client can spoof. Only loopback hosts are
     # trusted for that fallback (local/dev use); production should set
@@ -94,12 +97,12 @@ def check_redis_alive(fn: typing.Callable) -> typing.Callable:
 
 
 def as_validation_problem(
-    request: request,
+    req: Request,
     problem_type: str,
     problem_title: str,
     invalid_params: typing.List[typing.Dict[str, str]]
-) -> make_response:
-    base_url = set_base_url(request)
+) -> Response:
+    base_url = set_base_url(req)
 
     problem = {
         "type": f"{base_url}{problem_type}",
@@ -110,12 +113,12 @@ def as_validation_problem(
 
 
 def as_not_found_problem(
-    request: request,
+    req: Request,
     problem_type: str,
     problem_title: str,
     invalid_params: typing.List[typing.Dict[str, str]]
-) -> make_response:
-    base_url = set_base_url(request)
+) -> Response:
+    base_url = set_base_url(req)
 
     problem = {
         "type": f"{base_url}{problem_type}",
@@ -128,7 +131,7 @@ def as_not_found_problem(
 def as_problem_response(
     problem: typing.Dict[str, typing.Any],
     status_code: typing.Optional[int] = None
-) -> make_response:
+) -> Response:
     if not isinstance(status_code, int) or not status_code:
         status_code = 400
 
@@ -190,7 +193,7 @@ def clean_input() -> typing.Tuple[int, str]:
     return TIME_CONVERSION[time_period], password
 
 
-def set_base_url(req: request) -> str:
+def set_base_url(req: Request) -> str:
     scheme = 'http' if NO_SSL else 'https'
     if HOST_OVERRIDE:
         base_url = f'{scheme}://{HOST_OVERRIDE}/'
@@ -206,12 +209,12 @@ def set_base_url(req: request) -> str:
 
 
 @app.route('/', methods=['GET'])
-def index():
+def index() -> str:
     return render_template('set_password.html')
 
 
 @app.route('/', methods=['POST'])
-def handle_password():
+def handle_password() -> typing.Union[Response, str, typing.Tuple[str, int]]:
     password = request.form.get('password')
     ttl = request.form.get('ttl')
     if password and ttl and not empty(password) and not empty(ttl):
@@ -234,7 +237,7 @@ def handle_password():
 
 
 @app.route('/api/set_password/', methods=['POST'])
-def api_handle_password():
+def api_handle_password() -> Response:
     password = request.json.get('password')
     ttl = int(request.json.get('ttl', DEFAULT_API_TTL))
     if password and isinstance(ttl, int) and ttl <= MAX_TTL:
@@ -247,7 +250,7 @@ def api_handle_password():
 
 
 @app.route('/api/v2/passwords', methods=['POST'])
-def api_v2_set_password():
+def api_v2_set_password() -> Response:
     password = request.json.get('password')
     ttl = int(request.json.get('ttl', DEFAULT_API_TTL))
 
@@ -294,7 +297,7 @@ def api_v2_set_password():
 
 
 @app.route('/api/v2/passwords/<token>', methods=['HEAD'])
-def api_v2_check_password(token: str):
+def api_v2_check_password(token: str) -> typing.Tuple[str, int]:
     token = unquote_plus(token)
     if not password_exists(token):
         # Return NotFound, to indicate that password does not exist
@@ -305,7 +308,7 @@ def api_v2_check_password(token: str):
 
 
 @app.route('/api/v2/passwords/<token>', methods=['GET'])
-def api_v2_retrieve_password(token: str):
+def api_v2_retrieve_password(token: str) -> Response:
     token = unquote_plus(token)
     password = get_password(token)
     if not password:
@@ -322,7 +325,7 @@ def api_v2_retrieve_password(token: str):
 
 
 @app.route('/<password_key>', methods=['GET'])
-def preview_password(password_key: str):
+def preview_password(password_key: str) -> typing.Union[str, typing.Tuple[str, int]]:
     password_key = unquote_plus(password_key)
     if not password_exists(password_key):
         return render_template('expired.html'), 404
@@ -331,7 +334,7 @@ def preview_password(password_key: str):
 
 
 @app.route('/<password_key>', methods=['POST'])
-def show_password(password_key: str):
+def show_password(password_key: str) -> typing.Union[str, typing.Tuple[str, int]]:
     password_key = unquote_plus(password_key)
     password = get_password(password_key)
     if not password:
@@ -342,12 +345,12 @@ def show_password(password_key: str):
 
 @app.route('/_/_/health', methods=['GET'])
 @check_redis_alive
-def health_check():
+def health_check() -> typing.Dict[typing.Any, typing.Any]:
     return {}
 
 
 @check_redis_alive
-def main():
+def main() -> None:
     app.run(host=os.environ.get('SNAPPASS_BIND_ADDRESS', '0.0.0.0'),
             port=int(os.environ.get('SNAPPASS_PORT', 5000)))
 
