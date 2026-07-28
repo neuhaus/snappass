@@ -48,7 +48,8 @@ if os.environ.get('MOCK_REDIS'):
     redis_client = FakeStrictRedis(version=(6, 2), protocol=2)  # type: ignore
 elif os.environ.get('REDIS_URL'):
     redis_url = os.environ.get('REDIS_URL')
-    assert redis_url is not None
+    if not redis_url:
+        raise ValueError("REDIS_URL is empty")
     redis_client = redis.StrictRedis.from_url(redis_url)
 else:
     redis_host = os.environ.get('REDIS_HOST', 'localhost')
@@ -336,7 +337,7 @@ def health_check() -> typing.Dict[typing.Any, typing.Any]:
 
 @check_redis_alive
 def main() -> None:
-    app.run(host=os.environ.get('SNAPPASS_BIND_ADDRESS', '0.0.0.0'),
+    app.run(host=os.environ.get('SNAPPASS_BIND_ADDRESS', '0.0.0.0'),  # noqa: S104
             port=int(os.environ.get('SNAPPASS_PORT', 5000)))
 
 

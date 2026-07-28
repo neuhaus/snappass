@@ -70,13 +70,12 @@ Here's how to set up ``snappass`` for local development.
 
     $ git clone git@github.com:your_name_here/snappass.git
 
-3. Install your local copy into a ``virtualenv``. Assuming you have
-   ``virtualenvwrapper`` installed, this is how you set up your fork for local
-   development::
+3. Install your local copy into a ``virtualenv``. It is recommended to use standard ``venv``::
 
-    $ mkvirtualenv snappass
+    $ python -m venv venv
+    $ source venv/bin/activate
     $ cd snappass/
-    $ python setup.py develop
+    $ pip install -e .
     $ make dev
 
 4. Create a branch for local development::
@@ -92,29 +91,19 @@ Here's how to set up ``snappass`` for local development.
 
   You now have a running instance on localhost:5000/
 
-6. Please add some tests to tests.py and run tests::
+6. Please add some tests to tests.py. When you're done making changes, check that your changes pass all tests and security linters (Ruff, Pip-Audit, etc.)::
 
     $ make test
 
-7. When you're done making changes, check that your changes pass the tests and
-   flake8::
+   (Tox will automatically run all linting, security scans, and tests with coverage output.)
 
-    $ flake8 snappass tests.py setup.py
-    $ tox
-
-8. Check that the test coverage hasn't dropped::
-
-    $ coverage run --source snappass tests.py
-    $ coverage report -m
-    $ coverage html
-
-9. Commit your changes and push your branch to GitHub::
+7. Commit your changes and push your branch to GitHub::
 
     $ git add .
     $ git commit -m "Your detailed description of your changes."
     $ git push origin name-of-your-bugfix-or-feature
 
-10. Submit a pull request through the GitHub website.
+8. Submit a pull request through the GitHub website.
 
 Pull Request Guidelines
 -----------------------
