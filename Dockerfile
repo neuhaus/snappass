@@ -11,11 +11,9 @@ WORKDIR $APP_DIR
 COPY ["pyproject.toml", "requirements.txt", "README.rst", "AUTHORS.rst", "LICENSE", "$APP_DIR/"]
 COPY ["./snappass", "$APP_DIR/snappass"]
 
-RUN pip install -r requirements.txt
-
-RUN pybabel compile -d snappass/translations
-
-RUN pip install . && \
+RUN pip install --no-cache-dir -r requirements.txt && \
+    pybabel compile -d snappass/translations && \
+    pip install --no-cache-dir . && \
     chown -R snappass $APP_DIR && \
     chgrp -R snappass $APP_DIR
 
