@@ -63,6 +63,8 @@ def get_password(storage_key: str) -> typing.Optional[str]:
     password = redis_client.getdel(storage_key)
 
     if password is not None:
+        if isinstance(password, str):
+            return password
         return password.decode('utf-8')
     return None
 
