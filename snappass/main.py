@@ -171,7 +171,8 @@ def api_handle_password() -> Response:
     ttl = int(request.json.get('ttl', DEFAULT_API_TTL))
 
     if password and len(password) > 384 * 1024:
-        return make_response(jsonify(error=_('The secret is too long. The maximum allowed size is 256kb.')), 400)
+        error_msg = _('The secret is too long. The maximum allowed size is 256kb.')
+        return make_response(jsonify(error=error_msg), 400)
     if password and isinstance(ttl, int) and ttl <= MAX_TTL:
         token = set_password(password, ttl)
         base_url = set_base_url(request)
