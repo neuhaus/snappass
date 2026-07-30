@@ -17,6 +17,14 @@ services:
 
     redis:
         image: "redis:latest"
+        user: "999:999"
+        cap_drop:
+            - ALL
+        read_only: true
         command: redis-server /usr/local/etc/redis/redis.conf
         volumes:
-            - ./redis.conf:/usr/local/etc/redis/redis.conf
+            - ./redis.conf:/usr/local/etc/redis/redis.conf:ro
+            - redis_data:/data
+
+volumes:
+    redis_data:
