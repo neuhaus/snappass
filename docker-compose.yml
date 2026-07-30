@@ -8,12 +8,14 @@ services:
             - "5000:5000"
         stop_signal: SIGINT
         environment:
-            - REDIS_HOST=redis
+            - REDIS_URL=unix:///var/run/redis/redis.sock
             - NO_SSL=True
             # REQUIRED: You must set a strong, random SECRET_KEY for production use!
-            - SECRET_KEY=""
+            - SECRET_KEY=
         depends_on:
           - redis
+        volumes:
+            - redis_sock:/var/run/redis
 
     redis:
         image: "redis:latest"
@@ -22,6 +24,8 @@ services:
         volumes:
             - ./redis.conf:/usr/local/etc/redis/redis.conf:ro
             - redis_data:/data
+            - redis_sock:/var/run/redis
 
 volumes:
     redis_data:
+    redis_sock:

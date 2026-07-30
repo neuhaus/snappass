@@ -77,7 +77,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         if (!response.ok) {
-          throw new Error('Server returned an error');
+          let errMsg = 'Server returned an error';
+          try {
+            const errData = await response.json();
+            if (errData.error) errMsg = errData.error;
+            else if (errData.title) errMsg = errData.title;
+          } catch(e) {}
+          throw new Error(errMsg);
         }
 
         const data = await response.json();
@@ -106,7 +112,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
       } catch (err) {
         console.error(err);
-        showError(errorGeneric);
+        const msg = err.message === 'Server returned an error' ? errorGeneric : err.message;
+        showError(msg);
         btn.disabled = false;
         btn.textContent = textDefault;
       }

@@ -243,3 +243,5 @@ msgstr ""
 #~ "oder bitten Sie den/die Absender/in, "
 #~ "Ihnen ein neues Passwort zu senden."
 
+msgid "The secret is too long. The maximum allowed size is 256kb."
+msgstr "Das Geheimnis ist zu lang. Die maximal erlaubte Größe ist 256kb."

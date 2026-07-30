@@ -235,3 +235,5 @@ msgstr ""
 #~ "vraag de verzender om een nieuw "
 #~ "wachtwoord link te versturen."
 
+msgid "The secret is too long. The maximum allowed size is 256kb."
+msgstr "Het geheim is te lang. De maximaal toegestane grootte is 256kb."

@@ -25,12 +25,13 @@ app = Flask(__name__)
 if os.environ.get('DEBUG'):
     app.debug = True
 secret_key = os.environ.get('SECRET_KEY')
-if not secret_key:
+if not secret_key or not secret_key.strip('"\' '):
     raise ValueError(
         "Error: SECRET_KEY environment variable is not set. "
         "It is required for securely signing session cookies."
     )
 app.secret_key = secret_key
+app.config['MAX_CONTENT_LENGTH'] = 512 * 1024
 app.config.update(
     dict(STATIC_URL=os.environ.get('STATIC_URL', 'static')))
 
@@ -138,6 +139,13 @@ def index() -> str:
 def handle_password() -> typing.Union[Response, str, typing.Tuple[str, int]]:
     password = request.form.get('password')
     ttl = request.form.get('ttl')
+
+    if password and len(password) > 384 * 1024:
+        error_msg = _('The secret is too long. The maximum allowed size is 256kb.')
+        if request.accept_mimetypes.accept_json:
+            return make_response(jsonify(error=error_msg), 400)
+        else:
+            abort(400)
     if password and ttl and not empty(password) and not empty(ttl):
         ttl_val = TIME_CONVERSION.get(ttl.lower())
         if not ttl_val:
@@ -161,6 +169,9 @@ def handle_password() -> typing.Union[Response, str, typing.Tuple[str, int]]:
 def api_handle_password() -> Response:
     password = request.json.get('password')
     ttl = int(request.json.get('ttl', DEFAULT_API_TTL))
+
+    if password and len(password) > 384 * 1024:
+        return make_response(jsonify(error=_('The secret is too long. The maximum allowed size is 256kb.')), 400)
     if password and isinstance(ttl, int) and ttl <= MAX_TTL:
         token = set_password(password, ttl)
         base_url = set_base_url(request)
@@ -181,6 +192,11 @@ def api_v2_set_password() -> Response:
         invalid_params.append({
             "name": "password",
             "reason": "The password is required and must not be empty."
+        })
+    elif len(password) > 384 * 1024:
+        invalid_params.append({
+            "name": "password",
+            "reason": _("The secret is too long. The maximum allowed size is 256kb.")
         })
 
     if not isinstance(ttl, int) or ttl > MAX_TTL:

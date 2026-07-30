@@ -234,3 +234,5 @@ msgstr ""
 #~ "envió que te envíe un nuevo "
 #~ "secreto."
 
+msgid "The secret is too long. The maximum allowed size is 256kb."
+msgstr "El secreto es demasiado largo. El tamaño máximo permitido es 256kb."
